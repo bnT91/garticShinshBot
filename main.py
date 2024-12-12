@@ -111,45 +111,82 @@ def process(message):
                 bot.send_message(message.chat.id, "Не Вы создали данную игру. 🕔Ожидайте подтверждения админа для старта.")
 
 
+@bot.message_handler(commands=["abort"])
+def abort(message):
+    global game, prep, players, words, last_words, stories, creator
+    if message.from_user.id == creator and game:
+        for player in players:
+            bot.send_message(player, "👾☎️Итак, игра окончена! Подводим результаты.")
+        for story in stories:
+            for p in players:
+                bot.send_message(p, "\n".join(story))
+        sleep(6)
+
+        game = False
+        prep = False
+        players.clear()
+        words.clear()
+        last_words.clear()
+        stories.clear()
+        creator = None
+
+
 def next_sentence(message, args):
     global words, last_words, stories
-    message, last = message, args[0]
-    if not last:
-        words[message.from_user.id] = [message.text]
-    else:
-        words[message.from_user.id] = [message.text, last]
-    cnt = len(words) - sum([1 if not i else 0 for i in words.values()])
-    for player in players:
-        if player != message.from_user.id:
-            bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name}</b> "
-                                     f"написал своё предложение. Сделали свой ход: <i>"
-                                     f"{cnt}/{len(players)}</i>.", parse_mode="html")
-    bot.send_message(message.chat.id, f"Ваше предложение принято. На данный момент сделали свой ход: <i>{cnt}/{len(players)}</i>.",
-                            parse_mode="html")
 
-    print(len(players), words, stories)
-    while len(words) - sum([0 if not i else 1 for i in words.values()]) > 0:
-        sleep(0.3)
-        # print(len(players), words)
-        last_words = list(words.values())
+    if message.text == "/abort":
+        abort(message)
 
-    last_words = list(words.values())
+    if message.from_user.id not in words.keys():
+        return
 
-    for w in words.keys():
-        words[w] = None
+    if not words[message.from_user.id] and game:
+        message, last = message, args[0]
+        if not last:
+            words[message.from_user.id] = [message.text]
+        else:
+            words[message.from_user.id] = [message.text, last]
+        cnt = len(words) - sum([1 if not i else 0 for i in words.values()])
+        for player in players:
+            if player != message.from_user.id:
+                bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name}</b> "
+                                         f"написал своё предложение. Сделали свой ход: <i>"
+                                         f"{cnt}/{len(players)}</i>.", parse_mode="html")
+        bot.send_message(message.chat.id, f"Ваше предложение принято. На данный момент сделали свой ход: <i>{cnt}/{len(players)}</i>.",
+                                parse_mode="html")
 
-    if not last:
-        stories = [[str(last_words[i][0])] for i in range(len(players))]
-    else:
-        for wrd in last_words:
-            for st in stories:
-                if st[-1] == str(wrd[1]):
-                    st.append(str(wrd[0]))
+        print(len(players), words, stories)
+        # while len(words) - sum([0 if not i else 1 for i in words.values()]) > 0:
+        #     sleep(0.3)
+        #     # print(len(players), words)
+        #     last_words = list(words.values())
 
-    for player in players:
-        wrd = rand.choice(last_words)
-        bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
-        bot.register_next_step_handler_by_chat_id(player, lambda msg: next_sentence(msg, [str(wrd[0])]))
+        if len(words) == sum([0 if not i else 1 for i in words.values()]):
+
+            last_words = list(words.values())
+
+            for w in words.keys():
+                words[w] = None
+
+            if not last:
+                stories = [[str(last_words[i][0])] for i in range(len(players))]
+            else:
+                for wrd in last_words:
+                    for st in stories:
+                        if st[-1] == str(wrd[1]):
+                            st.append(str(wrd[0]))
+
+            crash = last_words.copy()
+            rand.shuffle(crash)
+            for id in range(len(players)):
+                wrd = crash[id]
+                player = players[id]
+                bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
+                bot.register_next_step_handler_by_chat_id(player, lambda msg: next_sentence(msg, [str(wrd[0])]))
 
 
-bot.polling(non_stop=True)
+while True:
+    try:
+        bot.polling(non_stop=True)
+    except Exception as e:
+        print(e)
