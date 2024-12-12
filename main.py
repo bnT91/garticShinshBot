@@ -1,5 +1,7 @@
 import telebot
 from telebot import types
+import random as rand
+from time import sleep
 
 bot = telebot.TeleBot('7892869505:AAEMltK8z1DRKhMjJ5HsU_IhTwGss7GDxZs')
 
@@ -7,6 +9,9 @@ allowed_users = []
 game = False
 prep = False
 players = []
+words = {}
+last_words = []
+stories = []
 creator = None
 
 with open("allowed_users.txt", "r") as f:
@@ -50,46 +55,101 @@ def query_callback(callback):
 
 @bot.message_handler(commands=["create"])
 def create(message):
-    global game, prep, players, creator
-    if prep:
-        bot.send_message(message.chat.id, "Игра уже создана. 🔗Чтобы присоединиться, напишите /join.")
+    if message.from_user.id in allowed_users:
+        global game, prep, players, creator
+        if prep:
+            bot.send_message(message.chat.id, "Игра уже создана. 🔗Чтобы присоединиться, напишите /join.")
 
-    elif not game:
-        bot.send_message(message.chat.id, "🎲🎮Вы создали новую игру. Сейчас участвуете только Вы. Каждый игрок, кто напишет /join, присоединится. "
-                                          "Когда Вы посчитаете, что набралось достаточное количество участников, напишите /process и игра начнётся. ")
-        creator = message.from_user.id
-        players.append(creator)
-        prep = True
+        elif not game:
+            bot.send_message(message.chat.id, "🎲🎮Вы создали новую игру. Сейчас участвуете только Вы. Каждый игрок, кто напишет /join, присоединится. "
+                                              "Когда Вы посчитаете, что набралось достаточное количество участников, напишите /process и игра начнётся. ")
+            creator = message.from_user.id
+            players.append(creator)
+            prep = True
 
-    else:
-        bot.send_message(message.chat.id, "Игра уже идёт. Пожалуйста, дождитесь её окончания и попробуйте ещё раз.")
+        else:
+            bot.send_message(message.chat.id, "Игра уже идёт. Пожалуйста, дождитесь её окончания и попробуйте ещё раз.")
 
 
 @bot.message_handler(commands=["join"])
 def join(message):
-    global players
-    if prep:
-        if message.from_user.id not in players:
-            bot.send_message(message.chat.id, "🔗Вы присоединились. Когда создатель игры напишет /process, она начнётся. ")
-            players.append(message.from_user.id)
+    if message.from_user.id in allowed_users:
+        global players
+        if prep:
+            if message.from_user.id not in players:
+                bot.send_message(message.chat.id, "🔗Вы присоединились. Когда создатель игры напишет /process, она начнётся. ")
+                for player in players:
+                    bot.send_message(player, f"Игрок <b>{message.from_user.first_name} {message.from_user.last_name}</b> присоединился!",
+                                     parse_mode="html")
+                players.append(message.from_user.id)
+            else:
+                bot.send_message(message.chat.id, "Вы уже в игре. Ожидайте начала.")
+        elif game:
+            bot.send_message(message.chat.id, "К сожалению, вы не можете присоединиться к уже начатой игре. 🔚Пожалуйста, дождитесь её конца.")
         else:
-            bot.send_message(message.chat.id, "Вы уже в игре. Ожидайте начала.")
-    elif not game:
-        bot.send_message(message.chat.id, "К сожалению, вы не можете присоединиться к уже начатой игре. 🔚Пожалуйста, дождитесь её конца.")
-    else:
-        bot.send_message(message.chat.id, "В данный момент игры не существует. Чтобы создать новую, напишите /create.")
+            bot.send_message(message.chat.id, "В данный момент игры не существует. Чтобы создать новую, напишите /create.")
 
 
 @bot.message_handler(commands=["process"])
 def process(message):
-    global prep, game
-    if prep:
-        if message.from_user.id == creator:
-            game = True
-            prep = False
-            bot.send_message(message.chat.id, "Игра началась! Для её остановки напишите /abort.")
-        else:
-            bot.send_message(message.chat.id, "Не Вы создали данную игру. 🕔Ожидайте админа для старта.")
+    if message.from_user.id in allowed_users:
+        global prep, game
+        global words
+        if prep:
+            if message.from_user.id == creator:
+                game = True
+                prep = False
+                words = {i: None for i in players}
+                bot.send_message(message.chat.id, "Игра началась! Для её остановки напишите /abort.")
+                for player in players:
+                    if player != creator:
+                        bot.send_message(player, "Создатель игры начинает её!")
+                    bot.send_sticker(player, r"CAACAgIAAxkBAAEK2vVnWm82vTns4GHMz6NFmF6ePHXl_wACpUgAAtXJmEgxSgjp7qwRmDYE")
+                    mesg = bot.send_message(player, "Напишите любое предложение. Можете дать волю фантазии и начать историю!")
+                    bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg, [None]))
+            else:
+                bot.send_message(message.chat.id, "Не Вы создали данную игру. 🕔Ожидайте подтверждения админа для старта.")
+
+
+def next_sentence(message, args):
+    global words, last_words, stories
+    message, last = message, args[0]
+    if not last:
+        words[message.from_user.id] = [message.text]
+    else:
+        words[message.from_user.id] = [message.text, last]
+    cnt = len(words) - sum([1 if not i else 0 for i in words.values()])
+    for player in players:
+        if player != message.from_user.id:
+            bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name}</b> "
+                                     f"написал своё предложение. Сделали свой ход: <i>"
+                                     f"{cnt}/{len(players)}</i>.", parse_mode="html")
+    bot.send_message(message.chat.id, f"Ваше предложение принято. На данный момент сделали свой ход: <i>{cnt}/{len(players)}</i>.",
+                            parse_mode="html")
+
+    print(len(players), words, stories)
+    while len(words) - sum([0 if not i else 1 for i in words.values()]) > 0:
+        sleep(0.3)
+        # print(len(players), words)
+        last_words = list(words.values())
+
+    last_words = list(words.values())
+
+    for w in words.keys():
+        words[w] = None
+
+    if not last:
+        stories = [[str(last_words[i][0])] for i in range(len(players))]
+    else:
+        for wrd in last_words:
+            for st in stories:
+                if st[-1] == str(wrd[1]):
+                    st.append(str(wrd[0]))
+
+    for player in players:
+        wrd = rand.choice(last_words)
+        bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
+        bot.register_next_step_handler_by_chat_id(player, lambda msg: next_sentence(msg, [str(wrd[0])]))
 
 
 bot.polling(non_stop=True)
