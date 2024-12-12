@@ -13,6 +13,7 @@ words = {}
 last_words = []
 stories = []
 creator = None
+giving = {}
 
 with open("allowed_users.txt", "r") as f:
     for line in f:
@@ -94,7 +95,7 @@ def join(message):
 def process(message):
     if message.from_user.id in allowed_users:
         global prep, game
-        global words
+        global words, giving
         if prep:
             if message.from_user.id == creator:
                 game = True
@@ -102,11 +103,13 @@ def process(message):
                 words = {i: None for i in players}
                 bot.send_message(message.chat.id, "Игра началась! Для её остановки напишите /abort.")
                 for player in players:
+                    giving[player] = None
+                for player in players:
                     if player != creator:
                         bot.send_message(player, "Создатель игры начинает её!")
                     bot.send_sticker(player, r"CAACAgIAAxkBAAEK2vVnWm82vTns4GHMz6NFmF6ePHXl_wACpUgAAtXJmEgxSgjp7qwRmDYE")
                     mesg = bot.send_message(player, "Напишите любое предложение. Можете дать волю фантазии и начать историю!")
-                    bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg, [None]))
+                    bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg))
             else:
                 bot.send_message(message.chat.id, "Не Вы создали данную игру. 🕔Ожидайте подтверждения админа для старта.")
 
@@ -114,13 +117,12 @@ def process(message):
 @bot.message_handler(commands=["abort"])
 def abort(message):
     global game, prep, players, words, last_words, stories, creator
-    if message.from_user.id == creator and game:
+    if message.from_user.id in [creator, 5401218650] and game:
         for player in players:
             bot.send_message(player, "👾☎️Итак, игра окончена! Подводим результаты.")
         for story in stories:
             for p in players:
                 bot.send_message(p, "\n".join(story))
-        sleep(6)
 
         game = False
         prep = False
@@ -128,11 +130,12 @@ def abort(message):
         words.clear()
         last_words.clear()
         stories.clear()
+        giving.clear()
         creator = None
 
 
-def next_sentence(message, args):
-    global words, last_words, stories
+def next_sentence(message):
+    global words, last_words, stories, giving
 
     if message.text == "/abort":
         abort(message)
@@ -141,21 +144,21 @@ def next_sentence(message, args):
         return
 
     if not words[message.from_user.id] and game:
-        message, last = message, args[0]
+        message, last = message, giving[message.from_user.id]
         if not last:
-            words[message.from_user.id] = [message.text]
+            words[message.from_user.id] = [message.text, None]
         else:
             words[message.from_user.id] = [message.text, last]
         cnt = len(words) - sum([1 if not i else 0 for i in words.values()])
         for player in players:
             if player != message.from_user.id:
-                bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name}</b> "
+                bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name
+                if message.from_user.last_name else "=)"}</b> "
                                          f"написал своё предложение. Сделали свой ход: <i>"
                                          f"{cnt}/{len(players)}</i>.", parse_mode="html")
         bot.send_message(message.chat.id, f"Ваше предложение принято. На данный момент сделали свой ход: <i>{cnt}/{len(players)}</i>.",
                                 parse_mode="html")
 
-        print(len(players), words, stories)
         # while len(words) - sum([0 if not i else 1 for i in words.values()]) > 0:
         #     sleep(0.3)
         #     # print(len(players), words)
@@ -164,25 +167,27 @@ def next_sentence(message, args):
         if len(words) == sum([0 if not i else 1 for i in words.values()]):
 
             last_words = list(words.values())
-
+            # print(last_words)
             for w in words.keys():
                 words[w] = None
 
             if not last:
-                stories = [[str(last_words[i][0])] for i in range(len(players))]
+                stories = [[w[0]] for w in last_words]
             else:
                 for wrd in last_words:
-                    for st in stories:
-                        if st[-1] == str(wrd[1]):
-                            st.append(str(wrd[0]))
+                    for stss in range(len(stories)):
+                        st = stories[stss]
+                        if st[-1] == wrd[1]:
+                            stories[stss].append(wrd[0])
 
             crash = last_words.copy()
             rand.shuffle(crash)
             for id in range(len(players)):
                 wrd = crash[id]
                 player = players[id]
-                bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
-                bot.register_next_step_handler_by_chat_id(player, lambda msg: next_sentence(msg, [str(wrd[0])]))
+                mesg = bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
+                giving[player] = wrd[0]
+                bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg))
 
 
 while True:
