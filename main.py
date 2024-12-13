@@ -120,6 +120,8 @@ def abort(message):
     if message.from_user.id in [creator, 5401218650] and game:
         for player in players:
             bot.send_message(player, "👾☎️Итак, игра окончена! Подводим результаты.")
+            bot.send_sticker(player, "CAACAgIAAxkBAAEK4RVnW8NQ_Ok1lLu9aG"
+                                     "DEJ1R3g_ApFQAC7iIAAkzHsUkoAAFvfUGcnf42BA")
         for story in stories:
             for p in players:
                 bot.send_message(p, "\n".join(story))
@@ -146,9 +148,9 @@ def next_sentence(message):
     if not words[message.from_user.id] and game:
         message, last = message, giving[message.from_user.id]
         if not last:
-            words[message.from_user.id] = [message.text, None]
+            words[message.from_user.id] = [message.text, None, message.from_user.id]
         else:
-            words[message.from_user.id] = [message.text, last]
+            words[message.from_user.id] = [message.text, last, message.from_user.id]
         cnt = len(words) - sum([1 if not i else 0 for i in words.values()])
         for player in players:
             if player != message.from_user.id:
@@ -180,13 +182,32 @@ def next_sentence(message):
                         if st[-1] == wrd[1]:
                             stories[stss].append(wrd[0])
 
+            Repeatings = True
+
             crash = last_words.copy()
-            rand.shuffle(crash)
+
+            while Repeatings:
+                rand.shuffle(crash)
+                giv_authors = {}
+
+                for id in range(len(players)):
+                    wrd = crash[id]
+                    player = players[id]
+
+                    giving[player] = wrd[0]
+                    giv_authors[player] = wrd[2]
+
+                for player in players:
+                    if player == giv_authors[player]:
+                        Repeatings = True
+                        break
+                else:
+                    Repeatings = False
+
             for id in range(len(players)):
-                wrd = crash[id]
                 player = players[id]
+                wrd = crash[id]
                 mesg = bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
-                giving[player] = wrd[0]
                 bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg))
 
 
