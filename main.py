@@ -142,10 +142,25 @@ def next_sentence(message):
     if message.text == "/abort":
         abort(message)
 
+    all_flag = True
+
+    if message.text[:4] == "/all":
+        all_flag = False
+        try:
+            txt = message.text[5:]
+        except Exception:
+            pass
+        else:
+            if txt != "":
+                for player in players:
+                    if player != message.from_user.id:
+                        bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name
+                        if message.from_user.last_name else "=)"}</b>: {txt}", parse_mode="html")
+        bot.register_next_step_handler_by_chat_id(message.chat.id, next_sentence)
     if message.from_user.id not in words.keys():
         return
 
-    if not words[message.from_user.id] and game:
+    if not words[message.from_user.id] and game and all_flag:
         message, last = message, giving[message.from_user.id]
         if not last:
             words[message.from_user.id] = [message.text, None, message.from_user.id]
