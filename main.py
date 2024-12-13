@@ -79,6 +79,8 @@ def join(message):
         if prep:
             if message.from_user.id not in players:
                 bot.send_message(message.chat.id, "🔗Вы присоединились. Когда создатель игры напишет /process, она начнётся. ")
+                bot.send_sticker(message.chat.id,
+                                 "CAACAgIAAxkBAAEK5Z9nXHPIO67k6VuQsa41eanN3zxoCwAC_moAAhH46UrE0kODsB9ubDYE")
                 for player in players:
                     bot.send_message(player, f"Игрок <b>{message.from_user.first_name} {message.from_user.last_name}</b> присоединился!",
                                      parse_mode="html")
@@ -224,6 +226,20 @@ def next_sentence(message):
                 wrd = crash[id]
                 mesg = bot.send_message(player, f"Продолжите: <i>{str(wrd[0])}</i>", parse_mode="html")
                 bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg))
+
+
+@bot.message_handler(commands=["all"])
+def all(message):
+    try:
+        txt = message.text[5:]
+    except Exception:
+        pass
+    else:
+        if txt != "":
+            for player in players:
+                if player != message.from_user.id:
+                    bot.send_message(player, f"<b>{message.from_user.first_name} {message.from_user.last_name
+                    if message.from_user.last_name else "=)"}</b>: {txt}", parse_mode="html")
 
 
 while True:
