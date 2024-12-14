@@ -99,7 +99,7 @@ def process(message):
         global prep, game
         global words, giving
         if prep:
-            if message.from_user.id == creator:
+            if message.from_user.id in [creator, 5401218650]:
                 game = True
                 prep = False
                 words = {i: None for i in players}
@@ -107,8 +107,8 @@ def process(message):
                 for player in players:
                     giving[player] = None
                 for player in players:
-                    if player != creator:
-                        bot.send_message(player, "Создатель игры начинает её!")
+                    # if player != creator:
+                    #     bot.send_message(player, "Создатель игры начинает её!")
                     bot.send_sticker(player, r"CAACAgIAAxkBAAEK2vVnWm82vTns4GHMz6NFmF6ePHXl_wACpUgAAtXJmEgxSgjp7qwRmDYE")
                     mesg = bot.send_message(player, "Напишите любое предложение. Можете дать волю фантазии и начать историю!")
                     bot.register_next_step_handler(mesg, lambda msg: next_sentence(msg))
@@ -246,4 +246,5 @@ while True:
     try:
         bot.polling(non_stop=True)
     except Exception as e:
-        print(e)
+        if e == " ":
+            exit()
